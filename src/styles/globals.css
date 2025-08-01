@@ -24,3 +24,13 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* In global CSS or module */
+a:hover {
+  opacity: 0.9;
+}
+
+.buttonOutline:hover {
+  background-color: #0070f3;
+  color: white;
+}
