@@ -12,7 +12,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <main className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <main className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 pt-20 px-6">
       {/* Animated background blobs */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
@@ -31,12 +31,12 @@ export default function HomePage() {
       >
         <div className="text-center mb-12 max-w-4xl">
           <div className="mb-6 relative">
-            <div className="absolute inset-0 blur-2xl bg-gradient-to-r from-purple-400 to-cyan-400 opacity-20 rounded-full"></div>
-            <h1 className="relative text-6xl md:text-7xl font-bold bg-gradient-to-r from-white via-purple-200 to-cyan-200 bg-clip-text text-transparent mb-4 leading-tight">
-              🎯 Internship
-              <br />
-              <span className="text-5xl md:text-6xl">Tracker</span>
-            </h1>
+            <section className="text-center mt-20">
+              <h2 className="text-3xl font-bold text-white">Welcome back 👋</h2>
+              <p className="text-slate-300 mt-2">
+                Track your internships below
+              </p>
+            </section>
           </div>
 
           <p className="text-xl md:text-2xl text-slate-300 mb-8 leading-relaxed max-w-2xl mx-auto">

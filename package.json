@@ -16,7 +16,9 @@
     "node-fetch": "^3.3.2",
     "puppeteer": "^24.15.0",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-dropzone": "^14.3.8",
+    "react-hot-toast": "^2.5.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

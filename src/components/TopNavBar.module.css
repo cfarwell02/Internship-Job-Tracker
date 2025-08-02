@@ -1,0 +1,45 @@
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: #0f172a; /* slate-900 */
+  border-bottom: 1px solid #1e293b; /* slate-800 */
+  z-index: 50;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.logo {
+  color: white;
+  font-size: 1.25rem;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.navlinks {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.navlink {
+  color: #e2e8f0; /* slate-200 */
+  text-decoration: none;
+  font-size: 1rem;
+  transition: color 0.2s;
+}
+
+.navlink:hover {
+  color: #fff;
+}

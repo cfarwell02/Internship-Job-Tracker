@@ -1,5 +1,5 @@
 import "../styles/globals.css";
-import MobileSidebar from "@/components/MobileSideBar";
+import TopNavBar from "@/components/TopNavBar";
 
 export const metadata = {
   title: "Internship Tracker",
@@ -9,10 +9,8 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className="bg-slate-900 text-white min-h-screen">
-        <MobileSidebar />
-        {children}
-      </body>
+      <TopNavBar />
+      <body className="bg-slate-900 text-white min-h-screen">{children}</body>
     </html>
   );
 }

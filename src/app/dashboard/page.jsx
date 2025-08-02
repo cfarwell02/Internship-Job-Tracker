@@ -29,7 +29,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <main className="min-h-screen py-12 px-4 max-w-5xl mx-auto">
+    <main className="min-h-screen py-12 max-w-5xl mx-auto pt-20 px-6">
       <h1 className="text-4xl font-bold text-white mb-8 text-center">
         📊 Internship Dashboard
       </h1>

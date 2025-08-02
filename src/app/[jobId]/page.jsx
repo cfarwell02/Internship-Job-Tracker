@@ -10,6 +10,7 @@ export default function JobDetailPage() {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+
   const [formData, setFormData] = useState({
     company: "",
     position: "",
@@ -33,6 +34,8 @@ export default function JobDetailPage() {
             position: data.position || "",
             status: data.status || "",
             notes: data.notes || "",
+            location: data.location || "",
+            salary: data.salary || "",
           });
         } else {
           setJob(null);
@@ -64,7 +67,6 @@ export default function JobDetailPage() {
 
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this job?")) return;
-
     try {
       const docRef = doc(db, "jobs", jobId);
       await deleteDoc(docRef);
@@ -74,169 +76,109 @@ export default function JobDetailPage() {
     }
   };
 
-  if (loading) return <p style={styles.container}>Loading...</p>;
-  if (!job) return <p style={styles.container}>❌ Job not found</p>;
+  if (loading) return <p className="text-center py-10">Loading...</p>;
+  if (!job)
+    return <p className="text-center py-10 text-red-500">❌ Job not found</p>;
 
   return (
-    <main style={styles.container}>
-      <h1 style={styles.title}>
-        🔍 {editing ? "Edit Internship" : job.company}
-      </h1>
+    <main className="min-h-screen bg-slate-900 text-white px-6 py-10 pt-20">
+      <div className="max-w-2xl mx-auto bg-slate-800 p-6 rounded-xl border border-slate-700 shadow">
+        <h1 className="text-3xl font-bold mb-6">
+          🔍 {editing ? "Edit Internship" : job.company}
+        </h1>
 
-      {editing ? (
-        <>
-          <input
-            name="company"
-            value={formData.company}
-            onChange={handleChange}
-            style={styles.input}
-          />
-          <input
-            name="position"
-            value={formData.position}
-            onChange={handleChange}
-            style={styles.input}
-          />
-          <select
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-            style={styles.input}
-          >
-            <option>Applied</option>
-            <option>Interviewing</option>
-            <option>Offer</option>
-            <option>Rejected</option>
-          </select>
-
-          <input
-            name="location"
-            placeholder="Location"
-            value={formData.location}
-            onChange={handleChange}
-            style={styles.input}
-          />
-
-          <input
-            name="salary"
-            placeholder="Salary"
-            value={formData.salary}
-            onChange={handleChange}
-            style={styles.input}
-          />
-
-          <textarea
-            name="notes"
-            value={formData.notes}
-            onChange={handleChange}
-            style={styles.textarea}
-          />
-          <button onClick={handleSave} style={styles.button}>
-            💾 Save
-          </button>
-        </>
-      ) : (
-        <>
-          <p>
-            <strong>Position:</strong> {job.position}
-          </p>
-          <p>
-            <strong>Status:</strong> {job.status}
-          </p>
-          <p>
-            <strong>Date Applied:</strong>{" "}
-            {job.dateApplied?.toDate?.().toLocaleDateString?.() ?? "N/A"}
-          </p>
-          <p>
-            <strong>Notes:</strong> {job.notes || "None"}
-          </p>
-          {job.url && (
+        {editing ? (
+          <>
+            <input
+              name="company"
+              value={formData.company}
+              onChange={handleChange}
+              className="input mb-4 w-full"
+            />
+            <input
+              name="position"
+              value={formData.position}
+              onChange={handleChange}
+              className="input mb-4 w-full"
+            />
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              className="input mb-4 w-full"
+            >
+              <option>Applied</option>
+              <option>Interviewing</option>
+              <option>Offer</option>
+              <option>Rejected</option>
+            </select>
+            <input
+              name="location"
+              placeholder="Location"
+              value={formData.location}
+              onChange={handleChange}
+              className="input mb-4 w-full"
+            />
+            <input
+              name="salary"
+              placeholder="Salary"
+              value={formData.salary}
+              onChange={handleChange}
+              className="input mb-4 w-full"
+            />
+            <textarea
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
+              className="input mb-4 w-full min-h-[120px]"
+            />
+            <button onClick={handleSave} className="button">
+              💾 Save
+            </button>
+          </>
+        ) : (
+          <>
             <p>
-              <strong>Original Posting:</strong>{" "}
-              <a
-                href={job.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: "#0070f3", textDecoration: "underline" }}
-              >
-                View Job ↗
-              </a>
+              <strong>Position:</strong> {job.position}
             </p>
-          )}
+            <p>
+              <strong>Status:</strong> {job.status}
+            </p>
+            <p>
+              <strong>Date Applied:</strong>{" "}
+              {job.dateApplied?.toDate?.().toLocaleDateString?.() ?? "N/A"}
+            </p>
+            <p>
+              <strong>Notes:</strong> {job.notes || "None"}
+            </p>
+            {job.url && (
+              <p>
+                <strong>Original Posting:</strong>{" "}
+                <a
+                  href={job.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline text-indigo-400 hover:text-indigo-300"
+                >
+                  View Job ↗
+                </a>
+              </p>
+            )}
 
-          <div style={styles.actions}>
-            <button onClick={() => setEditing(true)} style={styles.button}>
-              ✏️ Edit
-            </button>
-            <button onClick={handleDelete} style={styles.deleteButton}>
-              🗑️ Delete
-            </button>
-          </div>
-        </>
-      )}
+            <div className="mt-6 flex gap-4">
+              <button onClick={() => setEditing(true)} className="button">
+                ✏️ Edit
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-500 transition"
+              >
+                🗑️ Delete
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </main>
   );
 }
-
-const textColor = "#1a1a1a";
-
-const styles = {
-  container: {
-    padding: "2rem",
-    backgroundColor: "#f9f9f9",
-    minHeight: "100vh",
-    maxWidth: "800px",
-    margin: "0 auto",
-    color: textColor,
-  },
-  title: {
-    fontSize: "2rem",
-    fontWeight: "bold",
-    marginBottom: "1.5rem",
-    color: textColor,
-  },
-  input: {
-    width: "100%",
-    padding: "0.75rem",
-    fontSize: "1rem",
-    marginBottom: "1rem",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-    color: textColor,
-    transition: "border 0.2s ease",
-  },
-  textarea: {
-    width: "100%",
-    padding: "0.75rem",
-    fontSize: "1rem",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-    marginBottom: "1rem",
-    color: textColor,
-    minHeight: "100px",
-  },
-  button: {
-    padding: "0.75rem 1.25rem",
-    backgroundColor: "#0070f3",
-    color: "#fff",
-    fontSize: "1rem",
-    border: "none",
-    borderRadius: "6px",
-    marginRight: "1rem",
-    cursor: "pointer",
-    transition: "background-color 0.2s ease",
-  },
-  deleteButton: {
-    padding: "0.75rem 1.25rem",
-    backgroundColor: "#ff4d4d",
-    color: "#fff",
-    fontSize: "1rem",
-    border: "none",
-    borderRadius: "6px",
-    cursor: "pointer",
-    transition: "background-color 0.2s ease",
-  },
-  actions: {
-    marginTop: "1.5rem",
-  },
-};

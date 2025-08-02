@@ -113,7 +113,7 @@ export default function AddJobPage() {
   };
 
   return (
-    <main className="min-h-screen py-10 px-4 bg-slate-900 text-white">
+    <main className="min-h-screen py-10 bg-slate-900 text-white pt-20 px-6">
       <div className="max-w-3xl mx-auto bg-slate-800 p-8 rounded-2xl shadow-lg border border-slate-700">
         <h2 className="text-3xl font-bold mb-6">📋 Internship Details</h2>
 
