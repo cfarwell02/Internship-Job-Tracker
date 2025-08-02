@@ -14,7 +14,7 @@ export default function TopNavBar() {
     <header className={styles.topbar}>
       <div className={styles.container}>
         <Link href="/" className={styles.logo}>
-          📋 Internship Tracker
+          Welcome back, Connor!
         </Link>
         <nav className={styles.navlinks}>
           {links.map((link) => (
