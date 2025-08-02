@@ -43,6 +43,7 @@ async function fetchPageWithPuppeteer(url) {
   ) {
     await page.type("#username", process.env.LINKEDIN_EMAIL);
     await page.type("#password", process.env.LINKEDIN_PASSWORD);
+    console.log("🔗 LinkedIn login detected, attempting to log in...");
     await Promise.all([
       page.click("button[type='submit']"),
       page
@@ -213,13 +214,26 @@ export async function POST(req) {
   try {
     let { url } = await req.json();
 
-    // Normalize Handshake search URLs
+    // 🔁 Normalize Handshake URLs
     if (url.includes("joinhandshake.com/job-search/")) {
       const jobIdMatch = url.match(/job-search\/(\d+)/);
       if (jobIdMatch) {
         const jobId = jobIdMatch[1];
         url = `https://app.joinhandshake.com/jobs/${jobId}`;
         console.log(`🔁 Rewritten Handshake job URL: ${url}`);
+      }
+    }
+
+    // 🔁 Normalize LinkedIn recommended/collections URLs
+    if (
+      url.includes("linkedin.com/jobs/collections") &&
+      url.includes("currentJobId=")
+    ) {
+      const jobIdMatch = url.match(/currentJobId=(\d+)/);
+      if (jobIdMatch) {
+        const jobId = jobIdMatch[1];
+        url = `https://www.linkedin.com/jobs/view/${jobId}`;
+        console.log(`🔁 Rewritten LinkedIn job URL: ${url}`);
       }
     }
 

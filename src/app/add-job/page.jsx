@@ -31,6 +31,7 @@ export default function AddJobPage() {
   };
 
   const extractJobData = async () => {
+    setLoadingExtract(true); // <-- Start loading
     try {
       const res = await fetch("/api/extract", {
         method: "POST",
@@ -39,7 +40,7 @@ export default function AddJobPage() {
       });
 
       if (!res.ok) {
-        const errorText = await res.text(); // <– helpful for debugging
+        const errorText = await res.text();
         console.error("Server error:", errorText);
         throw new Error("Job extraction failed. Server returned error.");
       }
@@ -77,6 +78,8 @@ export default function AddJobPage() {
     } catch (err) {
       console.error("❌ Failed to parse AI response:", err);
       alert("Could not extract job details.");
+    } finally {
+      setLoadingExtract(false); // <-- End loading
     }
   };
 
