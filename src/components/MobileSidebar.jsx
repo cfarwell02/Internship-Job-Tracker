@@ -6,7 +6,7 @@ import styles from "./MobileSidebar.module.css";
 const links = [
   { href: "/", label: "Home" },
   { href: "/add-job", label: "Add Job" },
-  { href: "/saved-jobs", label: "Saved Jobs" },
+  { href: "/dashboard", label: "Saved Jobs" },
   { href: "/settings", label: "Settings" },
 ];
 

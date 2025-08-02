@@ -99,10 +99,6 @@ async function fetchPageWithPuppeteer(url) {
       ]);
     } else {
       console.warn("❌ Could not find 'Continue with email' link.");
-      await page.screenshot({
-        path: "continue-link-missing.png",
-        fullPage: true,
-      });
     }
 
     // 3. Enter password
@@ -136,7 +132,6 @@ async function fetchPageWithPuppeteer(url) {
   const html = await page.content();
   const preview = html.slice(0, 500).replace(/\s+/g, " ");
 
-  await page.screenshot({ path: "handshake-debug.png", fullPage: true });
   await browser.close();
   return html;
 }

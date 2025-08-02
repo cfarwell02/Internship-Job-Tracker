@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -28,31 +29,32 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <main style={styles.main}>
-      <h1 style={styles.title}>Internship Dashboard</h1>
+    <main className="min-h-screen py-12 px-4 max-w-5xl mx-auto">
+      <h1 className="text-4xl font-bold text-white mb-8 text-center">
+        📊 Internship Dashboard
+      </h1>
 
       {loading ? (
-        <p style={styles.infoText}>Loading...</p>
+        <p className="text-center text-slate-400">Loading...</p>
       ) : jobs.length === 0 ? (
-        <p style={styles.infoText}>No jobs found.</p>
+        <p className="text-center text-slate-400">No jobs found.</p>
       ) : (
-        <div style={styles.list}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {jobs.map((job) => (
-            <Link
-              key={job.id}
-              href={`/${job.id}`}
-              style={{ textDecoration: "none", color: "inherit" }}
-            >
-              <div style={styles.card}>
-                <h3 style={styles.cardTitle}>{job.company}</h3>
-                <p>
-                  <strong>Position:</strong> {job.position}
+            <Link key={job.id} href={`/${job.id}`}>
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-sm hover:bg-white/10 transition duration-300 cursor-pointer shadow-md hover:shadow-lg">
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  {job.company}
+                </h3>
+                <p className="text-slate-300 text-sm">
+                  <strong className="text-white">Position:</strong>{" "}
+                  {job.position}
                 </p>
-                <p>
-                  <strong>Status:</strong> {job.status}
+                <p className="text-slate-300 text-sm">
+                  <strong className="text-white">Status:</strong> {job.status}
                 </p>
-                <p>
-                  <strong>Applied on:</strong>{" "}
+                <p className="text-slate-300 text-sm">
+                  <strong className="text-white">Applied on:</strong>{" "}
                   {job.dateApplied?.toDate?.().toLocaleDateString?.() ?? "N/A"}
                 </p>
               </div>
@@ -63,47 +65,3 @@ export default function DashboardPage() {
     </main>
   );
 }
-
-const textColor = "#1a1a1a";
-
-const styles = {
-  main: {
-    padding: "2rem",
-    backgroundColor: "#f9f9f9",
-    minHeight: "100vh",
-    maxWidth: "1000px",
-    margin: "0 auto",
-  },
-  title: {
-    fontSize: "2rem",
-    fontWeight: "bold",
-    marginBottom: "1.5rem",
-    color: textColor,
-  },
-  infoText: {
-    fontSize: "1.1rem",
-    color: "#555",
-    textAlign: "center",
-    marginTop: "2rem",
-  },
-  list: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-    gap: "1.5rem",
-  },
-  card: {
-    padding: "1.25rem",
-    border: "1px solid #eee",
-    borderRadius: "10px",
-    backgroundColor: "#fff",
-    boxShadow: "0 4px 10px rgba(0, 0, 0, 0.05)",
-    transition: "transform 0.15s ease, box-shadow 0.2s ease",
-    color: textColor,
-  },
-  cardTitle: {
-    marginBottom: "0.5rem",
-    fontSize: "1.2rem",
-    fontWeight: "600",
-    color: textColor,
-  },
-};

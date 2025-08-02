@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, Timestamp } from "firebase/firestore";
@@ -6,7 +7,6 @@ import { useRouter } from "next/navigation";
 
 export default function AddJobPage() {
   const router = useRouter();
-
   const [url, setUrl] = useState("");
   const [loadingExtract, setLoadingExtract] = useState(false);
 
@@ -88,7 +88,21 @@ export default function AddJobPage() {
         url: formData.url,
         dateApplied: Timestamp.now(),
       });
-      router.push("/dashboard");
+      setFormData({
+        company: "",
+        position: "",
+        status: "",
+        location: "",
+        salary: "",
+        notes: "",
+        job_type: "",
+        posted_date: "",
+        benefits: "",
+        url: "",
+        contact: "",
+      });
+
+      alert("Internship saved successfully!");
     } catch (err) {
       console.error("Error adding job:", err);
       alert("Failed to add job.");
@@ -96,48 +110,52 @@ export default function AddJobPage() {
   };
 
   return (
-    <main style={styles.main}>
-      <div style={styles.card}>
-        <h2 style={styles.sectionTitle}>📋 Internship Details</h2>
+    <main className="min-h-screen py-10 px-4 bg-slate-900 text-white">
+      <div className="max-w-3xl mx-auto bg-slate-800 p-8 rounded-2xl shadow-lg border border-slate-700">
+        <h2 className="text-3xl font-bold mb-6">📋 Internship Details</h2>
 
-        <div style={styles.extractSection}>
+        <div className="flex flex-col gap-4 mb-6">
           <input
             type="text"
             placeholder="Paste job posting URL"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            style={(styles.inputFull, styles.input)}
+            className="input w-full"
           />
           <button
             onClick={extractJobData}
-            style={{ ...styles.button, ...styles.extractButton }}
+            className="bg-emerald-600 hover:bg-emerald-500 transition text-white px-4 py-2 rounded"
           >
             {loadingExtract ? "Extracting..." : "Extract with AI"}
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
+        <form
+          onSubmit={handleSubmit}
+          className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+        >
           <input
             name="company"
             placeholder="Company"
             value={formData.company}
             onChange={handleChange}
+            className="input"
             required
-            style={styles.input}
           />
           <input
             name="position"
             placeholder="Position"
             value={formData.position}
             onChange={handleChange}
+            className="input"
             required
-            style={styles.input}
           />
+
           <select
             name="status"
             value={formData.status}
             onChange={handleChange}
-            style={styles.input}
+            className="input"
           >
             <option value="" disabled>
               Select status
@@ -152,63 +170,63 @@ export default function AddJobPage() {
             placeholder="Location"
             value={formData.location}
             onChange={handleChange}
-            style={styles.input}
+            className="input"
           />
           <input
             name="salary"
             placeholder="Salary"
             value={formData.salary}
             onChange={handleChange}
-            style={styles.input}
+            className="input"
           />
           <input
             name="contact"
             placeholder="Contact Info"
             value={formData.contact}
             onChange={handleChange}
-            style={styles.input}
+            className="input"
           />
           <input
             name="job_type"
             placeholder="Job Type"
             value={formData.job_type}
             onChange={handleChange}
-            style={styles.input}
+            className="input"
           />
           <input
             name="posted_date"
             placeholder="Date Posted"
             value={formData.posted_date}
             onChange={handleChange}
-            style={styles.input}
+            className="input"
           />
           <input
             name="benefits"
             placeholder="Benefits"
             value={formData.benefits}
             onChange={handleChange}
-            style={styles.input}
+            className="input"
           />
+
           <input
             name="url"
             placeholder="Original Job URL"
             value={formData.url}
             onChange={handleChange}
-            style={(styles.inputFull, styles.input)}
+            className="input col-span-full"
           />
+
           <textarea
             name="notes"
             placeholder="Notes (optional)"
             value={formData.notes}
             onChange={handleChange}
-            style={styles.textarea}
+            className="input col-span-full min-h-[120px]"
           />
+
           <button
             type="submit"
-            style={{
-              ...styles.button,
-              ...styles.submitButton,
-            }}
+            className="col-span-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2 px-4 rounded transition"
           >
             Submit
           </button>
@@ -217,76 +235,3 @@ export default function AddJobPage() {
     </main>
   );
 }
-
-const styles = {
-  main: {
-    padding: "2rem",
-    backgroundColor: "#f9f9f9",
-    minHeight: "100vh",
-  },
-  card: {
-    backgroundColor: "#fff",
-    padding: "2rem",
-    borderRadius: "12px",
-    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
-    maxWidth: "700px",
-    margin: "0 auto",
-    border: "1px solid #eee",
-  },
-  sectionTitle: {
-    fontSize: "1.5rem",
-    fontWeight: "bold",
-    marginBottom: "1rem",
-    color: "#333",
-  },
-  extractSection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.75rem",
-    marginBottom: "2rem",
-  },
-  form: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "1rem",
-  },
-  input: {
-    padding: "0.75rem",
-    fontSize: "1rem",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-    transition: "border 0.2s ease",
-    color: "#1a1a1a",
-  },
-  inputFull: {
-    gridColumn: "span 2",
-    padding: "0.75rem",
-    fontSize: "1rem",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-  },
-  textarea: {
-    gridColumn: "span 2",
-    padding: "0.75rem",
-    fontSize: "1rem",
-    borderRadius: "6px",
-    border: "1px solid #ccc",
-    minHeight: "100px",
-    color: "#1a1a1a",
-  },
-  button: {
-    padding: "0.75rem",
-    fontSize: "1rem",
-    border: "none",
-    borderRadius: "6px",
-    cursor: "pointer",
-    color: "#fff",
-  },
-  extractButton: {
-    backgroundColor: "#10b981", // green
-  },
-  submitButton: {
-    backgroundColor: "#0070f3",
-    gridColumn: "span 2",
-  },
-};
