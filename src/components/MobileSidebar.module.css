@@ -1,0 +1,61 @@
+.hamburger {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 100;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: rgb(0, 0, 0);
+  cursor: pointer;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 250px;
+  background: #1e293b; /* slate-800 */
+  padding: 2rem 1rem;
+  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: white;
+  cursor: pointer;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4rem;
+}
+
+.link {
+  color: white;
+  text-decoration: none;
+  font-size: 1.125rem;
+  margin-bottom: 1rem;
+  transition: color 0.2s;
+}
+
+.link:hover {
+  color: #93c5fd; /* tailwind blue-300 */
+}

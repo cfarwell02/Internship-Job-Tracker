@@ -38,9 +38,22 @@ export default function AddJobPage() {
         body: JSON.stringify({ url }),
       });
 
-      const json = await res.json();
+      if (!res.ok) {
+        const errorText = await res.text(); // <– helpful for debugging
+        console.error("Server error:", errorText);
+        throw new Error("Job extraction failed. Server returned error.");
+      }
 
-      // You can then parse and use it:
+      let json;
+      try {
+        json = await res.json();
+      } catch (e) {
+        const text = await res.text();
+        console.error("⚠️ Unexpected non-JSON response:", text);
+        alert("Unexpected error from server. Check console for details.");
+        return;
+      }
+
       const cleaned = json.data
         .replace(/^```json/, "")
         .replace(/^```/, "")

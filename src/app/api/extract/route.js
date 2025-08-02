@@ -13,58 +13,130 @@ async function fetchPageContent(url) {
       },
     });
     const html = await res.text();
+
     return html.length > 500 ? html : null;
-  } catch {
+  } catch (err) {
+    console.warn("⚠️ fetchPageContent failed:", err);
     return null;
   }
 }
 
 async function fetchPageWithPuppeteer(url) {
-  // 🔁 Rewriting LinkedIn collection URLs to direct job post if needed
-  if (
-    url.includes("linkedin.com/jobs/collections") &&
-    url.includes("currentJobId=")
-  ) {
-    const jobId = new URL(url).searchParams.get("currentJobId");
-    if (jobId) {
-      url = `https://www.linkedin.com/jobs/view/${jobId}`;
-    }
-  }
-
-  const browser = await puppeteer.launch({ headless: "new" });
+  const browser = await puppeteer.launch({
+    headless: "new",
+    slowMo: 100,
+  });
   const page = await browser.newPage();
 
-  await page.goto(url, { waitUntil: "networkidle2" });
+  await page.setUserAgent(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+  );
 
-  await page
-    .waitForSelector(".description__text", { timeout: 10000 })
-    .catch(() => {
-      console.warn("⚠️ Description text not found in time.");
-    });
+  await page.goto(url, { waitUntil: "domcontentloaded" });
 
   const pageUrl = page.url();
-  const isLinkedInLogin = pageUrl.includes("/login");
 
-  if (isLinkedInLogin || (await page.$("input#session_password"))) {
+  // LinkedIn login
+  if (
+    pageUrl.includes("linkedin.com/login") ||
+    (await page.$("input#session_password"))
+  ) {
     await page.type("#username", process.env.LINKEDIN_EMAIL);
     await page.type("#password", process.env.LINKEDIN_PASSWORD);
-    await page.click("button[type='submit']");
+    await Promise.all([
+      page.click("button[type='submit']"),
+      page
+        .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 10000 })
+        .catch(() => console.warn("⏳ LinkedIn: wait failed")),
+    ]);
+    await page.goto(url, { waitUntil: "networkidle2" });
+  }
 
-    try {
-      await page.waitForNavigation({
-        waitUntil: "networkidle2",
-        timeout: 10000,
+  // ✅ Handshake Login (Full Debug Flow)
+  if (url.includes("joinhandshake.com")) {
+    // 1. Check for 'Enter email' screen (Edge/clean browser scenario)
+    const emailInput = await page.$("input[type='email']");
+    if (emailInput) {
+      await emailInput.type(process.env.HANDSHAKE_EMAIL);
+
+      const nextBtn = await page.evaluateHandle(() => {
+        return Array.from(document.querySelectorAll("button")).find(
+          (btn) => btn.textContent?.trim() === "Next"
+        );
       });
-    } catch {
-      console.warn("⚠️ No navigation after login, waiting for content...");
-      await page.waitForTimeout(5000);
+
+      if (nextBtn) {
+        await Promise.all([
+          nextBtn.asElement().click(),
+          page
+            .waitForNavigation({
+              waitUntil: "domcontentloaded",
+              timeout: 10000,
+            })
+            .catch(() => console.warn("⏳ No nav after Next. Continuing...")),
+        ]);
+      } else {
+        console.warn("⚠️ Could not find 'Next' button after typing email.");
+      }
     }
+
+    // 2. Click "Continue with email" (as an <a> tag)
+
+    const contLink = await page.$(
+      "a[href*='requested_authentication_method=standard']"
+    );
+    if (contLink) {
+      await Promise.all([
+        contLink.click(),
+        page
+          .waitForNavigation({
+            waitUntil: "domcontentloaded",
+            timeout: 10000,
+          })
+          .catch(() =>
+            console.warn("⏳ No nav after 'Continue with email'. Continuing...")
+          ),
+      ]);
+    } else {
+      console.warn("❌ Could not find 'Continue with email' link.");
+      await page.screenshot({
+        path: "continue-link-missing.png",
+        fullPage: true,
+      });
+    }
+
+    // 3. Enter password
+    const pwInput = await page
+      .waitForSelector("input[type='password']", { timeout: 10000 })
+      .catch(() => null);
+    if (pwInput) {
+      await pwInput.type(process.env.HANDSHAKE_PASSWORD);
+
+      const loginBtn = await page.evaluateHandle(() => {
+        return Array.from(document.querySelectorAll("button")).find(
+          (btn) => btn.textContent?.trim() === "Log in"
+        );
+      });
+
+      if (loginBtn && loginBtn.asElement()) {
+        await Promise.all([
+          loginBtn.asElement().click(),
+          page
+            .waitForNavigation({ waitUntil: "networkidle2", timeout: 15000 })
+            .catch(() => console.warn("⏳ No nav after Login. Continuing...")),
+        ]);
+      }
+    }
+
+    // 4. Return to original job URL
 
     await page.goto(url, { waitUntil: "networkidle2" });
   }
 
   const html = await page.content();
-  await page.screenshot({ path: "linkedin-job.png", fullPage: true });
+  const preview = html.slice(0, 500).replace(/\s+/g, " ");
+
+  await page.screenshot({ path: "handshake-debug.png", fullPage: true });
   await browser.close();
   return html;
 }
@@ -72,11 +144,15 @@ async function fetchPageWithPuppeteer(url) {
 function extractCleanText(html) {
   const $ = cheerio.load(html);
   $("script, style, iframe, img, noscript").remove();
+
   const text =
     $("body").text().trim() ||
     $("main").text().trim() ||
     $("html").text().trim();
-  return text.replace(/\s+/g, " ").slice(0, 7000);
+
+  const cleaned = text.replace(/\s+/g, " ").slice(0, 7000);
+
+  return cleaned;
 }
 
 async function getStructuredJobData(text) {
@@ -127,20 +203,50 @@ Here is the job text:
     }),
   });
 
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || "{}";
+  const raw = await res.text();
+
+  try {
+    const data = JSON.parse(raw);
+    return data.choices?.[0]?.message?.content || "{}";
+  } catch (err) {
+    console.warn("⚠️ Failed to parse AI JSON:", err);
+    return "{}";
+  }
 }
 
 export async function POST(req) {
   try {
-    const { url } = await req.json();
+    let { url } = await req.json();
+
+    // Normalize Handshake search URLs
+    if (url.includes("joinhandshake.com/job-search/")) {
+      const jobIdMatch = url.match(/job-search\/(\d+)/);
+      if (jobIdMatch) {
+        const jobId = jobIdMatch[1];
+        url = `https://app.joinhandshake.com/jobs/${jobId}`;
+        console.log(`🔁 Rewritten Handshake job URL: ${url}`);
+      }
+    }
 
     let html = await fetchPageContent(url);
-    if (!html || html.includes("Sign in") || html.length < 100) {
+
+    const loginGateKeywords = [
+      "Sign in",
+      "Sign up",
+      "Enter your email",
+      "Get connected",
+    ];
+    const shouldUsePuppeteer =
+      !html ||
+      html.length < 5000 ||
+      loginGateKeywords.some((kw) => html.includes(kw));
+
+    if (shouldUsePuppeteer) {
       html = await fetchPageWithPuppeteer(url);
     }
 
     const text = extractCleanText(html);
+
     if (text.length < 100) {
       return NextResponse.json(
         { success: false, error: "Not enough readable job info found" },
@@ -149,6 +255,7 @@ export async function POST(req) {
     }
 
     const aiReply = await getStructuredJobData(text);
+
     return NextResponse.json({ success: true, data: aiReply });
   } catch (err) {
     console.error("❌ AI extraction failed:", err);
