@@ -5,155 +5,257 @@ import puppeteer from "puppeteer";
 
 dotenv.config();
 
+/**
+ * Attempts to fetch page content using a standard fetch request.
+ * Returns HTML if successful and content length is sufficient, otherwise null.
+ * @param {string} url - The URL to fetch.
+ * @returns {Promise<string|null>} The HTML content or null.
+ */
 async function fetchPageContent(url) {
   try {
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
       },
+      // Adding a timeout for the fetch request to prevent hanging
+      signal: AbortSignal.timeout(15000), // 15 seconds timeout
     });
+
+    if (!res.ok) {
+      console.warn(
+        `⚠️ fetchPageContent failed with status: ${res.status} for ${url}`
+      );
+      return null;
+    }
+
     const html = await res.text();
 
+    // Check if the HTML content is substantial enough to be useful.
+    // A very short HTML might indicate a redirect, an error page, or a login gate.
     return html.length > 500 ? html : null;
   } catch (err) {
-    console.warn("⚠️ fetchPageContent failed:", err);
+    // Catch fetch errors like network issues or timeouts
+    console.warn("⚠️ fetchPageContent failed:", err.message);
     return null;
   }
 }
 
+/**
+ * Fetches page content using Puppeteer, handling dynamic content and logins.
+ * @param {string} url - The URL to fetch.
+ * @returns {Promise<string|null>} The HTML content or null.
+ */
 async function fetchPageWithPuppeteer(url) {
-  const browser = await puppeteer.launch({
-    headless: "new",
-    slowMo: 100,
-  });
-  const page = await browser.newPage();
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: "new", // Use the new headless mode
+      args: ["--no-sandbox", "--disable-setuid-sandbox"], // Recommended for production environments
+    });
+    const page = await browser.newPage();
 
-  await page.setUserAgent(
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
-  );
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+    );
 
-  await page.goto(url, { waitUntil: "domcontentloaded" });
+    // Navigate to the URL, waiting for the DOM to be loaded. This is faster than networkidle2.
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 }); // Increased timeout for initial load
 
-  const pageUrl = page.url();
+    const pageUrl = page.url();
 
-  // LinkedIn login
-  if (
-    pageUrl.includes("linkedin.com/login") ||
-    (await page.$("input#session_password"))
-  ) {
-    await page.type("#username", process.env.LINKEDIN_EMAIL);
-    await page.type("#password", process.env.LINKEDIN_PASSWORD);
-    console.log("🔗 LinkedIn login detected, attempting to log in...");
-    await Promise.all([
-      page.click("button[type='submit']"),
-      page
-        .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 10000 })
-        .catch(() => console.warn("⏳ LinkedIn: wait failed")),
-    ]);
-    await page.goto(url, { waitUntil: "networkidle2" });
-  }
+    // LinkedIn login handling
+    if (
+      pageUrl.includes("linkedin.com/login") ||
+      (await page.$("input#session_password"))
+    ) {
+      await page.type("#username", process.env.LINKEDIN_EMAIL);
+      await page.type("#password", process.env.LINKEDIN_PASSWORD);
+      await Promise.all([
+        page.click("button[type='submit']"),
+        // Wait for the page to fully load after login, 'load' is generally faster than 'networkidle2'
+        page
+          .waitForNavigation({ waitUntil: "load", timeout: 20000 })
+          .catch(() =>
+            console.warn("⏳ LinkedIn: post-login navigation wait failed")
+          ),
+      ]);
+      // After successful login, navigate back to the original job URL if not already there
+      if (page.url() !== url) {
+        await page.goto(url, { waitUntil: "load", timeout: 20000 });
+      }
+    }
 
-  // ✅ Handshake Login (Full Debug Flow)
-  if (url.includes("joinhandshake.com")) {
-    // 1. Check for 'Enter email' screen (Edge/clean browser scenario)
-    const emailInput = await page.$("input[type='email']");
-    if (emailInput) {
-      await emailInput.type(process.env.HANDSHAKE_EMAIL);
+    // Handshake Login handling
+    if (url.includes("joinhandshake.com")) {
+      // 1. Check for 'Enter email' screen and type email
+      const emailInputSelector = "input[type='email']";
+      const emailInput = await page
+        .waitForSelector(emailInputSelector, { timeout: 10000 })
+        .catch(() => null);
 
-      const nextBtn = await page.evaluateHandle(() => {
-        return Array.from(document.querySelectorAll("button")).find(
-          (btn) => btn.textContent?.trim() === "Next"
+      if (emailInput) {
+        await emailInput.type(process.env.HANDSHAKE_EMAIL);
+
+        // Wait for and click the 'Next' button
+        const nextBtn = await page
+          .waitForFunction(
+            (text) => {
+              const buttons = Array.from(document.querySelectorAll("button"));
+              return buttons.find((btn) => btn.textContent?.trim() === text);
+            },
+            { timeout: 10000 }, // Wait up to 10 seconds for the button
+            "Next"
+          )
+          .catch(() => null);
+
+        if (nextBtn) {
+          await Promise.all([
+            nextBtn.click(),
+            page
+              .waitForNavigation({
+                waitUntil: "domcontentloaded",
+                timeout: 15000,
+              })
+              .catch(() =>
+                console.warn(
+                  "⏳ Handshake: No nav after email Next. Continuing..."
+                )
+              ),
+          ]);
+        } else {
+          console.warn(
+            "⚠️ Handshake: Could not find 'Next' button after typing email."
+          );
+        }
+      } else {
+        console.warn(
+          "⚠️ Handshake: Email input field not found. Assuming already past email step or different flow."
         );
-      });
+      }
 
-      if (nextBtn) {
+      // 2. Click "Continue with email" (as an <a> tag) - this might appear after the email step
+      const contLinkSelector =
+        "a[href*='requested_authentication_method=standard']";
+      const contLink = await page
+        .waitForSelector(contLinkSelector, { visible: true, timeout: 10000 })
+        .catch(() => null);
+
+      if (contLink) {
         await Promise.all([
-          nextBtn.asElement().click(),
+          contLink.click(),
           page
             .waitForNavigation({
               waitUntil: "domcontentloaded",
-              timeout: 10000,
+              timeout: 15000,
             })
-            .catch(() => console.warn("⏳ No nav after Next. Continuing...")),
+            .catch(() =>
+              console.warn(
+                "⏳ Handshake: No nav after 'Continue with email'. Continuing..."
+              )
+            ),
         ]);
       } else {
-        console.warn("⚠️ Could not find 'Next' button after typing email.");
-      }
-    }
-
-    // 2. Click "Continue with email" (as an <a> tag)
-
-    const contLink = await page.$(
-      "a[href*='requested_authentication_method=standard']"
-    );
-    if (contLink) {
-      await Promise.all([
-        contLink.click(),
-        page
-          .waitForNavigation({
-            waitUntil: "domcontentloaded",
-            timeout: 10000,
-          })
-          .catch(() =>
-            console.warn("⏳ No nav after 'Continue with email'. Continuing...")
-          ),
-      ]);
-    } else {
-      console.warn("❌ Could not find 'Continue with email' link.");
-    }
-
-    // 3. Enter password
-    const pwInput = await page
-      .waitForSelector("input[type='password']", { timeout: 10000 })
-      .catch(() => null);
-    if (pwInput) {
-      await pwInput.type(process.env.HANDSHAKE_PASSWORD);
-
-      const loginBtn = await page.evaluateHandle(() => {
-        return Array.from(document.querySelectorAll("button")).find(
-          (btn) => btn.textContent?.trim() === "Log in"
+        console.warn(
+          "❌ Handshake: Could not find 'Continue with email' link or it was not visible."
         );
-      });
+      }
 
-      if (loginBtn && loginBtn.asElement()) {
-        await Promise.all([
-          loginBtn.asElement().click(),
-          page
-            .waitForNavigation({ waitUntil: "networkidle2", timeout: 15000 })
-            .catch(() => console.warn("⏳ No nav after Login. Continuing...")),
-        ]);
+      // 3. Enter password
+      const pwInputSelector = "input[type='password']";
+      const pwInput = await page
+        .waitForSelector(pwInputSelector, { timeout: 10000 })
+        .catch(() => null);
+
+      if (pwInput) {
+        await pwInput.type(process.env.HANDSHAKE_PASSWORD);
+
+        // Wait for and click the 'Log in' button
+        const loginBtn = await page
+          .waitForFunction(
+            (text) => {
+              const buttons = Array.from(document.querySelectorAll("button"));
+              return buttons.find((btn) => btn.textContent?.trim() === text);
+            },
+            { timeout: 10000 }, // Wait up to 10 seconds for the button
+            "Log in"
+          )
+          .catch(() => null);
+
+        if (loginBtn) {
+          await Promise.all([
+            loginBtn.click(),
+            page
+              .waitForNavigation({ waitUntil: "load", timeout: 25000 })
+              .catch(() =>
+                console.warn("⏳ Handshake: No nav after Login. Continuing...")
+              ),
+          ]);
+        } else {
+          console.warn("⚠️ Handshake: Could not find 'Log in' button.");
+        }
+      } else {
+        console.warn(
+          "⚠️ Handshake: Password input field not found. Assuming login not required or different flow."
+        );
+      }
+
+      // 4. Return to original job URL if not already there after login
+      if (page.url() !== url) {
+        await page.goto(url, { waitUntil: "load", timeout: 20000 });
       }
     }
 
-    // 4. Return to original job URL
-
-    await page.goto(url, { waitUntil: "networkidle2" });
+    const html = await page.content();
+    return html;
+  } catch (err) {
+    console.error("❌ Puppeteer fetch failed:", err);
+    return null;
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
   }
-
-  const html = await page.content();
-  const preview = html.slice(0, 500).replace(/\s+/g, " ");
-
-  await browser.close();
-  return html;
 }
 
+/**
+ * Extracts clean text from HTML using cheerio.
+ * @param {string} html - The HTML content.
+ * @returns {string} The cleaned text.
+ */
 function extractCleanText(html) {
   const $ = cheerio.load(html);
-  $("script, style, iframe, img, noscript").remove();
+  // Remove scripts, styles, iframes, images, and noscript tags to clean up the text
+  $(
+    "script, style, iframe, img, noscript, header, footer, nav, form, .hidden, [aria-hidden='true']"
+  ).remove();
 
+  // Prioritize main content areas for text extraction
   const text =
-    $("body").text().trim() ||
+    $("article").text().trim() ||
     $("main").text().trim() ||
+    $("body").text().trim() ||
     $("html").text().trim();
 
+  // Replace multiple spaces with a single space and limit length
   const cleaned = text.replace(/\s+/g, " ").slice(0, 7000);
 
   return cleaned;
 }
 
+/**
+ * Calls an external AI API to get structured job data from text.
+ * @param {string} text - The cleaned job description text.
+ * @returns {Promise<string>} The JSON string of structured job data.
+ */
 async function getStructuredJobData(text) {
   const apiKey = process.env.OPENROUTER_API_KEY?.trim();
-  if (!apiKey) throw new Error("Missing OpenRouter API key");
+  if (!apiKey) {
+    console.error(
+      "Missing OpenRouter API key. Please set OPENROUTER_API_KEY in your .env file."
+    );
+    throw new Error("Missing OpenRouter API key");
+  }
 
   const prompt = `
 Extract the following fields from the job post. Be as accurate and detailed as possible.
@@ -180,51 +282,94 @@ Here is the job text:
 """${text}"""
 `;
 
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "openai/gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "You extract job info into structured JSON.",
+  // Implement exponential backoff for AI API calls
+  const maxRetries = 3;
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
         },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.3,
-    }),
-  });
+        body: JSON.stringify({
+          model: "openai/gpt-3.5-turbo", // Using GPT-3.5-turbo for speed
+          messages: [
+            {
+              role: "system",
+              content: "You extract job info into structured JSON.",
+            },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.3, // Lower temperature for more consistent extraction
+        }),
+        signal: AbortSignal.timeout(30000), // 30 seconds timeout for AI API call
+      });
 
-  const raw = await res.text();
+      const raw = await res.text();
 
-  try {
-    const data = JSON.parse(raw);
-    return data.choices?.[0]?.message?.content || "{}";
-  } catch (err) {
-    console.warn("⚠️ Failed to parse AI JSON:", err);
-    return "{}";
+      if (!res.ok) {
+        console.error(
+          `❌ AI API call failed with status: ${res.status}, response: ${raw}`
+        );
+        throw new Error(`AI API error: ${res.statusText}`);
+      }
+
+      const data = JSON.parse(raw);
+      // Ensure the response structure is as expected
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        try {
+          // Attempt to parse the content to ensure it's valid JSON
+          JSON.parse(content);
+          return content;
+        } catch (jsonErr) {
+          console.warn("⚠️ AI returned invalid JSON. Retrying...", jsonErr);
+          // If AI returns invalid JSON, treat as a retryable error
+          throw new Error("Invalid JSON from AI");
+        }
+      } else {
+        console.warn("⚠️ AI response missing expected content. Retrying...");
+        throw new Error("AI response content missing");
+      }
+    } catch (err) {
+      attempt++;
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+        // console.warn(`Retrying AI extraction in ${delay / 1000} seconds... (Attempt ${attempt}/${maxRetries})`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      } else {
+        console.error("❌ AI extraction failed after multiple retries:", err);
+        return "{}"; // Return empty JSON on final failure
+      }
+    }
   }
+  return "{}"; // Should not be reached, but as a fallback
 }
 
 export async function POST(req) {
   try {
     let { url } = await req.json();
 
-    // 🔁 Normalize Handshake URLs
+    // Input validation for URL
+    if (!url || typeof url !== "string" || !url.startsWith("http")) {
+      return NextResponse.json(
+        { success: false, error: "Invalid or missing URL" },
+        { status: 400 }
+      );
+    }
+
+    // Normalize Handshake URLs
     if (url.includes("joinhandshake.com/job-search/")) {
       const jobIdMatch = url.match(/job-search\/(\d+)/);
       if (jobIdMatch) {
         const jobId = jobIdMatch[1];
         url = `https://app.joinhandshake.com/jobs/${jobId}`;
-        console.log(`🔁 Rewritten Handshake job URL: ${url}`);
       }
     }
 
-    // 🔁 Normalize LinkedIn recommended/collections URLs
+    // Normalize LinkedIn recommended/collections URLs
     if (
       url.includes("linkedin.com/jobs/collections") &&
       url.includes("currentJobId=")
@@ -233,43 +378,66 @@ export async function POST(req) {
       if (jobIdMatch) {
         const jobId = jobIdMatch[1];
         url = `https://www.linkedin.com/jobs/view/${jobId}`;
-        console.log(`🔁 Rewritten LinkedIn job URL: ${url}`);
       }
     }
 
+    // Attempt initial fetch with standard fetch
     let html = await fetchPageContent(url);
 
+    // Determine if Puppeteer is needed
     const loginGateKeywords = [
       "Sign in",
       "Sign up",
       "Enter your email",
       "Get connected",
+      "Log in", // Added "Log in" as a common keyword
+      "Join now", // Added "Join now"
+      "Create account", // Added "Create account"
     ];
+
+    // Use Puppeteer if initial fetch failed, content is too short, or login keywords are present.
+    // Increased the threshold for HTML length to be more aggressive about using Puppeteer
     const shouldUsePuppeteer =
       !html ||
-      html.length < 5000 ||
+      html.length < 10000 || // Adjusted threshold: if less than 10KB, try Puppeteer
       loginGateKeywords.some((kw) => html.includes(kw));
 
     if (shouldUsePuppeteer) {
       html = await fetchPageWithPuppeteer(url);
     }
 
+    if (!html) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to retrieve page content after all attempts.",
+        },
+        { status: 500 }
+      );
+    }
+
     const text = extractCleanText(html);
 
     if (text.length < 100) {
       return NextResponse.json(
-        { success: false, error: "Not enough readable job info found" },
+        {
+          success: false,
+          error: "Not enough readable job info found on the page.",
+        },
         { status: 400 }
       );
     }
 
     const aiReply = await getStructuredJobData(text);
 
-    return NextResponse.json({ success: true, data: aiReply });
+    return NextResponse.json({ success: true, data: JSON.parse(aiReply) }); // Parse AI reply before sending
   } catch (err) {
-    console.error("❌ AI extraction failed:", err);
+    console.error("❌ Job extraction process failed:", err);
     return NextResponse.json(
-      { success: false, error: err.message || "Server Error" },
+      {
+        success: false,
+        error: err.message || "Server Error during job extraction",
+      },
       { status: 500 }
     );
   }

@@ -30,54 +30,63 @@ export default function AddJobPage() {
     }));
   };
 
+  // Assuming this is within your React component or page file
+  // import { useState } from 'react'; // Make sure you have useState if using it for formData and loading states
+
   const extractJobData = async () => {
     setLoadingExtract(true); // <-- Start loading
     try {
       const res = await fetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url }), // Assuming 'url' is available in scope
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Server error:", errorText);
-        throw new Error("Job extraction failed. Server returned error.");
+        const errorResponse = await res
+          .json()
+          .catch(() => ({ error: "Unknown error" })); // Try to parse as JSON, fallback to generic error
+        console.error("Server error:", errorResponse.error);
+        // Instead of alert, set a state variable for UI display
+        // alert("Job extraction failed. Server returned error: " + errorResponse.error);
+        // Example: setError("Job extraction failed: " + errorResponse.error);
+        throw new Error(
+          errorResponse.error || "Job extraction failed. Server returned error."
+        );
       }
 
-      let json;
+      let responseJson;
       try {
-        json = await res.json();
+        responseJson = await res.json();
       } catch (e) {
         const text = await res.text();
-        console.error("⚠️ Unexpected non-JSON response:", text);
-        alert("Unexpected error from server. Check console for details.");
-        return;
+        console.error("⚠️ Unexpected non-JSON response from API:", text);
+        // alert("Unexpected error from server. Check console for details.");
+        // Example: setError("Unexpected error from server. Please check console.");
+        throw new Error("Unexpected non-JSON response from server.");
       }
 
-      const cleaned = json.data
-        .replace(/^```json/, "")
-        .replace(/^```/, "")
-        .replace(/```$/, "")
-        .trim();
-
-      const parsed = JSON.parse(cleaned);
+      // Now, responseJson.data is already the parsed job object.
+      // No need for .replace() or JSON.parse() here.
+      const parsedJobData = responseJson.data;
 
       setFormData((prev) => ({
         ...prev,
-        company: parsed.company || "Not provided",
-        position: parsed.title || "Not provided",
-        location: parsed.location || "Not provided",
-        salary: parsed.salary || "Not provided",
-        notes: parsed.description || "Not provided",
-        job_type: parsed.job_type || "Not provided",
-        posted_date: parsed.posted_date || "Not provided",
-        benefits: parsed.benefits || "Not provided",
-        url: url || "Not provided",
+        company: parsedJobData.company || "Not provided",
+        position: parsedJobData.title || "Not provided", // 'title' from AI maps to 'position' in your form
+        location: parsedJobData.location || "Not provided",
+        salary: parsedJobData.salary || "Not provided",
+        notes: parsedJobData.description || "Not provided", // 'description' from AI maps to 'notes'
+        job_type: parsedJobData.job_type || "Not provided",
+        posted_date: parsedJobData.posted_date || "Not provided",
+        benefits: parsedJobData.benefits || "Not provided",
+        url: url || "Not provided", // Ensure 'url' is still in scope or passed correctly
       }));
+      // Example: setError(null); // Clear any previous errors on success
     } catch (err) {
-      console.error("❌ Failed to parse AI response:", err);
-      alert("Could not extract job details.");
+      console.error("❌ Failed to extract job details:", err);
+      // alert("Could not extract job details.");
+      // Example: setError("Could not extract job details. Please try again.");
     } finally {
       setLoadingExtract(false); // <-- End loading
     }

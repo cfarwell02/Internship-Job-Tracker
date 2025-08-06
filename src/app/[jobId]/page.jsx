@@ -14,10 +14,15 @@ export default function JobDetailPage() {
   const [formData, setFormData] = useState({
     company: "",
     position: "",
+    status: "",
     location: "",
     salary: "",
-    status: "",
     notes: "",
+    job_type: "",
+    posted_date: "",
+    benefits: "",
+    url: "",
+    contact: "",
   });
 
   useEffect(() => {
@@ -33,9 +38,14 @@ export default function JobDetailPage() {
             company: data.company || "",
             position: data.position || "",
             status: data.status || "",
-            notes: data.notes || "",
             location: data.location || "",
             salary: data.salary || "",
+            notes: data.notes || "",
+            job_type: data.job_type || "",
+            posted_date: data.posted_date || "",
+            benefits: data.benefits || "",
+            url: data.url || "",
+            contact: data.contact || "",
           });
         } else {
           setJob(null);
@@ -91,22 +101,28 @@ export default function JobDetailPage() {
           <>
             <input
               name="company"
+              placeholder="Company Name"
               value={formData.company}
               onChange={handleChange}
               className="input mb-4 w-full"
             />
             <input
               name="position"
+              placeholder="Position Title"
               value={formData.position}
               onChange={handleChange}
               className="input mb-4 w-full"
             />
             <select
               name="status"
+              placeholder="Status"
               value={formData.status}
               onChange={handleChange}
               className="input mb-4 w-full"
             >
+              <option value="" disabled>
+                Select status
+              </option>
               <option>Applied</option>
               <option>Interviewing</option>
               <option>Offer</option>
@@ -126,6 +142,21 @@ export default function JobDetailPage() {
               onChange={handleChange}
               className="input mb-4 w-full"
             />
+            <input
+              name="contact"
+              placeholder="Contact"
+              value={formData.contact}
+              onChange={handleChange}
+              className="input mb-4 w-full"
+            />
+            <input
+              name="posted_date"
+              placeholder="Date Posted"
+              value={formData.posted_date}
+              onChange={handleChange}
+              className="input mb-4 w-full"
+            />
+
             <textarea
               name="notes"
               value={formData.notes}
@@ -139,17 +170,38 @@ export default function JobDetailPage() {
         ) : (
           <>
             <p>
-              <strong>Position:</strong> {job.position}
+              <strong>Company:</strong> {job.company || "N/A"}
             </p>
             <p>
-              <strong>Status:</strong> {job.status}
+              <strong>Position:</strong> {job.position || "N/A"}
+            </p>
+            <p>
+              <strong>Status:</strong> {job.status || "N/A"}
+            </p>
+            <p>
+              <strong>Location:</strong> {job.location || "N/A"}
+            </p>
+            <p>
+              <strong>Salary:</strong> {job.salary || "N/A"}
+            </p>
+            <p>
+              <strong>Job Type:</strong> {job.job_type || "N/A"}
+            </p>
+            <p>
+              <strong>Posted Date:</strong> {job.posted_date || "N/A"}
+            </p>
+            <p>
+              <strong>Benefits:</strong> {job.benefits || "N/A"}
+            </p>
+            <p>
+              <strong>Contact Info:</strong> {job.contact || "N/A"}
+            </p>
+            <p>
+              <strong>Notes:</strong> {job.notes || "None"}
             </p>
             <p>
               <strong>Date Applied:</strong>{" "}
               {job.dateApplied?.toDate?.().toLocaleDateString?.() ?? "N/A"}
-            </p>
-            <p>
-              <strong>Notes:</strong> {job.notes || "None"}
             </p>
             {job.url && (
               <p>
