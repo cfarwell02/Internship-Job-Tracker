@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import * as cheerio from "cheerio";
 import dotenv from "dotenv";
+import puppeteer from "puppeteer";
 
 dotenv.config();
 
@@ -10,7 +11,6 @@ dotenv.config();
  * @param {string} url - The URL to fetch.
  * @returns {Promise<string|null>} The HTML content or null.
  */
-
 async function fetchPageContent(url) {
   try {
     const res = await fetch(url, {
@@ -49,36 +49,11 @@ async function fetchPageContent(url) {
 async function fetchPageWithPuppeteer(url) {
   let browser;
   try {
-    let puppeteer;
-    let launchOptions = { headless: true };
-    const isVercel = !!process.env.VERCEL;
-
-    if (isVercel) {
-      const chromium = (await import("@sparticuz/chromium")).default;
-      puppeteer = await import("puppeteer-core");
-      launchOptions = {
-        args: chromium.args,
-        executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
-        defaultViewport: chromium.defaultViewport,
-      };
-    } else {
-      puppeteer = await import("puppeteer");
-    }
-
-    browser = await puppeteer.launch(launchOptions);
-
-    const page = await browser.newPage();
-
-    await page.setRequestInterception(true);
-    page.on("request", (req) => {
-      const type = req.resourceType();
-      if (["image", "stylesheet", "font", "media"].includes(type)) {
-        req.abort();
-      } else {
-        req.continue();
-      }
+    browser = await puppeteer.launch({
+      headless: "new", // Use the new headless mode
+      args: ["--no-sandbox", "--disable-setuid-sandbox"], // Recommended for production environments
     });
+    const page = await browser.newPage();
 
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
@@ -96,7 +71,7 @@ async function fetchPageWithPuppeteer(url) {
     ) {
       await page.type("#username", process.env.LINKEDIN_EMAIL);
       await page.type("#password", process.env.LINKEDIN_PASSWORD);
-      await Promise.allSettled([
+      await Promise.all([
         page.click("button[type='submit']"),
         // Wait for the page to fully load after login, 'load' is generally faster than 'networkidle2'
         page
@@ -135,7 +110,7 @@ async function fetchPageWithPuppeteer(url) {
           .catch(() => null);
 
         if (nextBtn) {
-          await Promise.allSettled([
+          await Promise.all([
             nextBtn.click(),
             page
               .waitForNavigation({
@@ -167,7 +142,7 @@ async function fetchPageWithPuppeteer(url) {
         .catch(() => null);
 
       if (contLink) {
-        await Promise.allSettled([
+        await Promise.all([
           contLink.click(),
           page
             .waitForNavigation({
@@ -208,7 +183,7 @@ async function fetchPageWithPuppeteer(url) {
           .catch(() => null);
 
         if (loginBtn) {
-          await Promise.allSettled([
+          await Promise.all([
             loginBtn.click(),
             page
               .waitForNavigation({ waitUntil: "load", timeout: 25000 })
@@ -227,10 +202,7 @@ async function fetchPageWithPuppeteer(url) {
 
       // 4. Return to original job URL if not already there after login
       if (page.url() !== url) {
-        await Promise.race([
-          page.goto(url, { waitUntil: "domcontentloaded" }),
-          new Promise((res) => setTimeout(res, 5000)), // fallback race
-        ]);
+        await page.goto(url, { waitUntil: "load", timeout: 20000 });
       }
     }
 
