@@ -70,6 +70,16 @@ async function fetchPageWithPuppeteer(url) {
 
     const page = await browser.newPage();
 
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      const type = req.resourceType();
+      if (["image", "stylesheet", "font", "media"].includes(type)) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
     );
@@ -86,7 +96,7 @@ async function fetchPageWithPuppeteer(url) {
     ) {
       await page.type("#username", process.env.LINKEDIN_EMAIL);
       await page.type("#password", process.env.LINKEDIN_PASSWORD);
-      await Promise.all([
+      await Promise.allSettled([
         page.click("button[type='submit']"),
         // Wait for the page to fully load after login, 'load' is generally faster than 'networkidle2'
         page
@@ -125,7 +135,7 @@ async function fetchPageWithPuppeteer(url) {
           .catch(() => null);
 
         if (nextBtn) {
-          await Promise.all([
+          await Promise.allSettled([
             nextBtn.click(),
             page
               .waitForNavigation({
@@ -157,7 +167,7 @@ async function fetchPageWithPuppeteer(url) {
         .catch(() => null);
 
       if (contLink) {
-        await Promise.all([
+        await Promise.allSettled([
           contLink.click(),
           page
             .waitForNavigation({
@@ -198,7 +208,7 @@ async function fetchPageWithPuppeteer(url) {
           .catch(() => null);
 
         if (loginBtn) {
-          await Promise.all([
+          await Promise.allSettled([
             loginBtn.click(),
             page
               .waitForNavigation({ waitUntil: "load", timeout: 25000 })
@@ -217,7 +227,10 @@ async function fetchPageWithPuppeteer(url) {
 
       // 4. Return to original job URL if not already there after login
       if (page.url() !== url) {
-        await page.goto(url, { waitUntil: "load", timeout: 20000 });
+        await Promise.race([
+          page.goto(url, { waitUntil: "domcontentloaded" }),
+          new Promise((res) => setTimeout(res, 5000)), // fallback race
+        ]);
       }
     }
 
