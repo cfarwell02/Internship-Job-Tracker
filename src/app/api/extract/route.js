@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import * as cheerio from "cheerio";
 import dotenv from "dotenv";
-import puppeteer from "puppeteer";
 
 dotenv.config();
 
@@ -11,6 +10,7 @@ dotenv.config();
  * @param {string} url - The URL to fetch.
  * @returns {Promise<string|null>} The HTML content or null.
  */
+
 async function fetchPageContent(url) {
   try {
     const res = await fetch(url, {
@@ -49,10 +49,25 @@ async function fetchPageContent(url) {
 async function fetchPageWithPuppeteer(url) {
   let browser;
   try {
-    browser = await puppeteer.launch({
-      headless: "new", // Use the new headless mode
-      args: ["--no-sandbox", "--disable-setuid-sandbox"], // Recommended for production environments
-    });
+    let puppeteer;
+    let launchOptions = { headless: true };
+    const isVercel = !!process.env.VERCEL;
+
+    if (isVercel) {
+      const chromium = (await import("@sparticuz/chromium")).default;
+      puppeteer = await import("puppeteer-core");
+      launchOptions = {
+        args: chromium.args,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+        defaultViewport: chromium.defaultViewport,
+      };
+    } else {
+      puppeteer = await import("puppeteer");
+    }
+
+    browser = await puppeteer.launch(launchOptions);
+
     const page = await browser.newPage();
 
     await page.setUserAgent(
