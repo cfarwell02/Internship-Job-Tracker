@@ -272,6 +272,83 @@ function extractCleanText(html) {
 }
 
 /**
+ * Attempts to pull structured JobPosting data from JSON-LD blocks before using AI.
+ * @param {string} html - The HTML content.
+ * @returns {object|null} Mapped job fields or null if none found.
+ */
+function extractJsonLdJob(html) {
+  const $ = cheerio.load(html);
+  let jobData = null;
+
+  $("script[type='application/ld+json']").each((_, el) => {
+    try {
+      const raw = $(el).contents().text();
+      const parsed = JSON.parse(raw);
+      const candidates = Array.isArray(parsed) ? parsed : [parsed];
+
+      for (const candidate of candidates) {
+        if (
+          candidate["@type"] === "JobPosting" ||
+          (Array.isArray(candidate["@type"]) &&
+            candidate["@type"].includes("JobPosting"))
+        ) {
+          jobData = candidate;
+          return false; // break out of cheerio loop
+        }
+      }
+    } catch {
+      // Ignore malformed JSON-LD blocks
+    }
+    return undefined;
+  });
+
+  if (!jobData) return null;
+
+  const cleanDescription = jobData.description
+    ? cheerio.load(jobData.description).text().trim()
+    : "";
+
+  const salaryInfo =
+    jobData.baseSalary?.value?.unitText && jobData.baseSalary?.value?.value
+      ? `${jobData.baseSalary.value.value} ${jobData.baseSalary.value.unitText}`
+      : jobData.baseSalary?.value?.currency
+        ? `${jobData.baseSalary.value.currency}`
+        : jobData.baseSalary?.value?.toString?.() || "";
+
+  const jobLocation =
+    jobData.jobLocation?.address?.addressLocality ||
+    jobData.jobLocation?.address?.addressRegion ||
+    jobData.jobLocation?.address?.addressCountry ||
+    jobData.jobLocation?.address?.streetAddress ||
+    jobData.jobLocation?.address?.postalCode ||
+    jobData.jobLocation?.address?.addressLocality;
+
+  return {
+    title: jobData.title || "",
+    company: jobData.hiringOrganization?.name || "",
+    location: jobLocation || jobData.jobLocationType || "",
+    description: cleanDescription,
+    requirements:
+      Array.isArray(jobData.skills)
+        ? jobData.skills.join(", ")
+        : jobData.qualifications || "",
+    salary: salaryInfo,
+    duration: jobData.employmentType || "",
+    remote:
+      jobData.jobLocationType === "TELECOMMUTE" ||
+      jobData.jobLocationType === "REMOTE" ||
+      jobData.jobLocationType === "Hybrid",
+    application_deadline: jobData.validThrough || "",
+    job_type: jobData.employmentType || "",
+    posted_date: jobData.datePosted || "",
+    benefits: Array.isArray(jobData.jobBenefits)
+      ? jobData.jobBenefits.join(", ")
+      : jobData.jobBenefits || "",
+    contact: jobData.hiringOrganization?.sameAs || "",
+  };
+}
+
+/**
  * Calls an external AI API to get structured job data from text.
  * @param {string} text - The cleaned job description text.
  * @returns {Promise<string>} The JSON string of structured job data.
@@ -447,13 +524,23 @@ export async function POST(req) {
     const text = extractCleanText(html);
 
     if (text.length < 100) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Not enough readable job info found on the page.",
-        },
-        { status: 400 }
-      );
+      const structured = extractJsonLdJob(html);
+      if (structured) {
+        return NextResponse.json({ success: true, data: structured });
+      } else {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Not enough readable job info found on the page.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const structured = extractJsonLdJob(html);
+    if (structured) {
+      return NextResponse.json({ success: true, data: structured });
     }
 
     const aiReply = await getStructuredJobData(text);
