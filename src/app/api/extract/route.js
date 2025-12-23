@@ -119,9 +119,15 @@ async function fetchPageWithPuppeteer(url) {
       ],
       defaultViewport: { width: 1024, height: 600 },
     };
-    const isVercel = !!process.env.VERCEL;
 
-    if (isVercel) {
+    // Prefer bundled Chrome from puppeteer; fall back to chromium + puppeteer-core if needed.
+    try {
+      puppeteer = await import("puppeteer");
+      const executablePath = await puppeteer.executablePath?.();
+      if (executablePath) {
+        launchOptions.executablePath = executablePath;
+      }
+    } catch {
       const chromium = (await import("@sparticuz/chromium")).default;
       puppeteer = await import("puppeteer-core");
       launchOptions = {
@@ -130,8 +136,6 @@ async function fetchPageWithPuppeteer(url) {
         headless: chromium.headless,
         defaultViewport: chromium.defaultViewport,
       };
-    } else {
-      puppeteer = await import("puppeteer");
     }
 
     browser = await puppeteer.launch(launchOptions);
