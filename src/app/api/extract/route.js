@@ -22,12 +22,7 @@ async function fetchPageContent(url) {
       signal: AbortSignal.timeout(15000), // 15 seconds timeout
     });
 
-    if (!res.ok) {
-      console.warn(
-        `⚠️ fetchPageContent failed with status: ${res.status} for ${url}`
-      );
-      return null;
-    }
+    if (!res.ok) return null;
 
     const html = await res.text();
 
@@ -41,6 +36,64 @@ async function fetchPageContent(url) {
   }
 }
 
+// Helper to block heavy assets/trackers
+function shouldAbortRequest(req, isHandshake) {
+  const type = req.resourceType();
+  const urlReq = req.url();
+  const blockedTypes =
+    type === "media" ||
+    type === "font" ||
+    (!isHandshake && (type === "image" || type === "stylesheet"));
+  const blockedTrackers =
+    urlReq.includes("google-analytics") ||
+    urlReq.includes("doubleclick") ||
+    urlReq.includes("googletagmanager") ||
+    urlReq.includes("facebook") ||
+    urlReq.includes("ads") ||
+    urlReq.includes("segment.io");
+
+  return blockedTypes || blockedTrackers;
+}
+
+// Helper to find a button by text
+async function findButtonByText(pageInstance, text) {
+  try {
+    const handle = await pageInstance.evaluateHandle((btnText) => {
+      const buttons = Array.from(document.querySelectorAll("button"));
+      return buttons.find(
+        (btn) => btn.textContent?.trim() === btnText
+      ) || null;
+    }, text);
+    const element = handle.asElement();
+    if (!element) {
+      await handle.dispose();
+      return null;
+    }
+    return element;
+  } catch {
+    return null;
+  }
+}
+
+// Wait for likely job content with fast/normal timings
+async function waitForJobContent(page, fastMode) {
+  const contentSelector =
+    "main [data-test='jobs-show'], main .jobs-show, h1, .job-title, [data-test='job-title']";
+  const selectorTimeout = fastMode ? 500 : 900;
+  const bodyTimeout = fastMode ? 800 : 1500;
+  const settle = fastMode ? 80 : 180;
+
+  const hasContent = await page
+    .waitForSelector(contentSelector, { timeout: selectorTimeout })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!hasContent) {
+    await page.waitForSelector("body", { timeout: bodyTimeout }).catch(() => {});
+  }
+  await new Promise((res) => setTimeout(res, settle));
+}
+
 /**
  * Fetches page content using Puppeteer, handling dynamic content and logins.
  * @param {string} url - The URL to fetch.
@@ -48,9 +101,24 @@ async function fetchPageContent(url) {
  */
 async function fetchPageWithPuppeteer(url) {
   let browser;
+  let page;
+  let handshakeOnJobPage = false;
+
   try {
     let puppeteer;
-    let launchOptions = { headless: true };
+    const fastMode = process.env.FAST_MODE === "true";
+    let launchOptions = {
+      headless: true,
+      args: [
+        "--disable-gpu",
+        "--disable-dev-shm-usage",
+        "--disable-setuid-sandbox",
+        "--no-sandbox",
+        "--disable-extensions",
+        "--disable-features=IsolateOrigins,site-per-process",
+      ],
+      defaultViewport: { width: 1024, height: 600 },
+    };
     const isVercel = !!process.env.VERCEL;
 
     if (isVercel) {
@@ -68,24 +136,31 @@ async function fetchPageWithPuppeteer(url) {
 
     browser = await puppeteer.launch(launchOptions);
 
-    const page = await browser.newPage();
+    page = await browser.newPage();
 
+    const isHandshake = url.includes("joinhandshake.com");
     await page.setRequestInterception(true);
     page.on("request", (req) => {
-      const type = req.resourceType();
-      if (["image", "stylesheet", "font", "media"].includes(type)) {
-        req.abort();
-      } else {
-        req.continue();
-      }
+      if (shouldAbortRequest(req, isHandshake)) return req.abort();
+      req.continue();
     });
 
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
     );
 
-    // Navigate to the URL, waiting for the DOM to be loaded. This is faster than networkidle2.
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 }); // Increased timeout for initial load
+    // Navigate to the URL, waiting for the DOM to be loaded. Retry once on timeout.
+    const navOpts = { waitUntil: "domcontentloaded", timeout: 20000 };
+    try {
+      await page.goto(url, navOpts);
+    } catch (err) {
+      if (err.name === "TimeoutError") {
+        console.warn("⏳ Initial goto timed out; retrying with same options");
+        await page.goto(url, navOpts);
+      } else {
+        throw err;
+      }
+    }
 
     const pageUrl = page.url();
 
@@ -100,14 +175,14 @@ async function fetchPageWithPuppeteer(url) {
         page.click("button[type='submit']"),
         // Wait for the page to fully load after login, 'load' is generally faster than 'networkidle2'
         page
-          .waitForNavigation({ waitUntil: "load", timeout: 20000 })
+          .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 9000 })
           .catch(() =>
             console.warn("⏳ LinkedIn: post-login navigation wait failed")
           ),
       ]);
       // After successful login, navigate back to the original job URL if not already there
       if (page.url() !== url) {
-        await page.goto(url, { waitUntil: "load", timeout: 20000 });
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 9000 });
       }
     }
 
@@ -116,23 +191,15 @@ async function fetchPageWithPuppeteer(url) {
       // 1. Check for 'Enter email' screen and type email
       const emailInputSelector = "input[type='email']";
       const emailInput = await page
-        .waitForSelector(emailInputSelector, { timeout: 10000 })
+        .waitForSelector(emailInputSelector, { timeout: 15000 })
         .catch(() => null);
 
       if (emailInput) {
+        await emailInput.click({ clickCount: 3 });
         await emailInput.type(process.env.HANDSHAKE_EMAIL);
 
         // Wait for and click the 'Next' button
-        const nextBtn = await page
-          .waitForFunction(
-            (text) => {
-              const buttons = Array.from(document.querySelectorAll("button"));
-              return buttons.find((btn) => btn.textContent?.trim() === text);
-            },
-            { timeout: 10000 }, // Wait up to 10 seconds for the button
-            "Next"
-          )
-          .catch(() => null);
+        const nextBtn = await findButtonByText(page, "Next");
 
         if (nextBtn) {
           await Promise.allSettled([
@@ -140,7 +207,7 @@ async function fetchPageWithPuppeteer(url) {
             page
               .waitForNavigation({
                 waitUntil: "domcontentloaded",
-                timeout: 15000,
+                timeout: 10000,
               })
               .catch(() =>
                 console.warn(
@@ -163,22 +230,23 @@ async function fetchPageWithPuppeteer(url) {
       const contLinkSelector =
         "a[href*='requested_authentication_method=standard']";
       const contLink = await page
-        .waitForSelector(contLinkSelector, { visible: true, timeout: 10000 })
+        .waitForSelector(contLinkSelector, { visible: true, timeout: 15000 })
         .catch(() => null);
 
       if (contLink) {
+        
         await Promise.allSettled([
           contLink.click(),
           page
             .waitForNavigation({
               waitUntil: "domcontentloaded",
-              timeout: 15000,
+              timeout: 10000,
             })
-            .catch(() =>
-              console.warn(
-                "⏳ Handshake: No nav after 'Continue with email'. Continuing..."
-              )
-            ),
+              .catch(() =>
+                console.warn(
+                  "⏳ Handshake: No nav after 'Continue with email'. Continuing..."
+                )
+              ),
         ]);
       } else {
         console.warn(
@@ -186,36 +254,51 @@ async function fetchPageWithPuppeteer(url) {
         );
       }
 
+      // 2b. Some screens show a single email field + 'Log in' button (no explicit password yet)
+      const directLoginBtn = await findButtonByText(page, "Log in");
+      if (directLoginBtn && !contLink) {
+        await Promise.allSettled([
+          directLoginBtn.click(),
+          page
+            .waitForNavigation({
+              waitUntil: "domcontentloaded",
+              timeout: 10000,
+            })
+            .catch(() =>
+              console.warn(
+                "⏳ Handshake: No nav after direct Log in. Continuing..."
+              )
+            ),
+        ]);
+      }
+
       // 3. Enter password
       const pwInputSelector = "input[type='password']";
       const pwInput = await page
-        .waitForSelector(pwInputSelector, { timeout: 10000 })
+        .waitForSelector(pwInputSelector, { timeout: 15000 })
         .catch(() => null);
 
       if (pwInput) {
+        await pwInput.click({ clickCount: 3 });
         await pwInput.type(process.env.HANDSHAKE_PASSWORD);
 
         // Wait for and click the 'Log in' button
-        const loginBtn = await page
-          .waitForFunction(
-            (text) => {
-              const buttons = Array.from(document.querySelectorAll("button"));
-              return buttons.find((btn) => btn.textContent?.trim() === text);
-            },
-            { timeout: 10000 }, // Wait up to 10 seconds for the button
-            "Log in"
-          )
-          .catch(() => null);
+        const loginBtn = await findButtonByText(page, "Log in");
 
         if (loginBtn) {
           await Promise.allSettled([
             loginBtn.click(),
             page
-              .waitForNavigation({ waitUntil: "load", timeout: 25000 })
+              .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 10000 })
               .catch(() =>
                 console.warn("⏳ Handshake: No nav after Login. Continuing...")
               ),
           ]);
+          // If navigation did not occur (e.g., modal flow), still wait briefly for DOM
+          await page.waitForSelector("body", { timeout: 4000 }).catch(() => {});
+          // Short settle window for content render
+          await new Promise((res) => setTimeout(res, 500));
+          handshakeOnJobPage = true;
         } else {
           console.warn("⚠️ Handshake: Could not find 'Log in' button.");
         }
@@ -226,18 +309,27 @@ async function fetchPageWithPuppeteer(url) {
       }
 
       // 4. Return to original job URL if not already there after login
-      if (page.url() !== url) {
+      if (!handshakeOnJobPage && page.url() !== url) {
         await Promise.race([
           page.goto(url, { waitUntil: "domcontentloaded" }),
           new Promise((res) => setTimeout(res, 5000)), // fallback race
         ]);
       }
+      await waitForJobContent(page, fastMode);
     }
 
     const html = await page.content();
     return html;
   } catch (err) {
     console.error("❌ Puppeteer fetch failed:", err);
+    if (page) {
+      try {
+        const screenshotPath = `/tmp/handshake_error_${Date.now()}.png`;
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+      } catch (sErr) {
+        console.warn("⚠️ Failed to capture error screenshot:", sErr.message);
+      }
+    }
     return null;
   } finally {
     if (browser) {
@@ -266,7 +358,7 @@ function extractCleanText(html) {
     $("html").text().trim();
 
   // Replace multiple spaces with a single space and limit length
-  const cleaned = text.replace(/\s+/g, " ").slice(0, 7000);
+  const cleaned = text.replace(/\s+/g, " ").slice(0, 6000);
 
   return cleaned;
 }
@@ -378,7 +470,7 @@ Return only raw JSON — do not wrap in code blocks.
   "remote": "true/false if it's remote-friendly",
   "application_deadline": "If listed",
   "job_type": "Full-time, part-time, contract, etc",
-  "posted_date": "When it was posted",
+  "posted_date": "Date the the posting started.",
   "benefits": "Any listed benefits",
   "contact": "Contact name or email if available"
 }
@@ -403,11 +495,12 @@ Here is the job text:
           messages: [
             {
               role: "system",
-              content: "You extract job info into structured JSON.",
+              content: "You extract job info into structured JSON. Keep answers concise; omit fluff.",
             },
             { role: "user", content: prompt },
           ],
           temperature: 0.3, // Lower temperature for more consistent extraction
+          max_tokens: 900, // Allow fuller descriptions without excessive length
         }),
         signal: AbortSignal.timeout(30000), // 30 seconds timeout for AI API call
       });
@@ -522,23 +615,19 @@ export async function POST(req) {
     }
 
     const text = extractCleanText(html);
+    const structured = extractJsonLdJob(html);
 
-    if (text.length < 100) {
-      const structured = extractJsonLdJob(html);
-      if (structured) {
-        return NextResponse.json({ success: true, data: structured });
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Not enough readable job info found on the page.",
-          },
-          { status: 400 }
-        );
-      }
+    if (text.length < 100 && !structured) {
+      console.warn("🤝 Handshake: Not enough readable job info after login.");
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Not enough readable job info found on the page.",
+        },
+        { status: 400 }
+      );
     }
 
-    const structured = extractJsonLdJob(html);
     if (structured) {
       return NextResponse.json({ success: true, data: structured });
     }

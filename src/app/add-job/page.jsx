@@ -34,6 +34,10 @@ export default function AddJobPage() {
   // import { useState } from 'react'; // Make sure you have useState if using it for formData and loading states
 
   const extractJobData = async () => {
+    if (!url.trim()) {
+      alert("Please enter a job posting URL before extracting.");
+      return;
+    }
     setLoadingExtract(true); // <-- Start loading
     try {
       const res = await fetch("/api/extract", {
@@ -94,6 +98,10 @@ export default function AddJobPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.status) {
+      alert("Please select a status before submitting.");
+      return;
+    }
     try {
       await addDoc(collection(db, "jobs"), {
         ...formData,
@@ -136,7 +144,8 @@ export default function AddJobPage() {
           />
           <button
             onClick={extractJobData}
-            className="bg-emerald-600 hover:bg-emerald-500 transition text-white px-4 py-2 rounded"
+            disabled={!url.trim()}
+            className="bg-emerald-600 hover:bg-emerald-500 transition text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loadingExtract ? "Extracting..." : "Extract with AI"}
           </button>
@@ -168,6 +177,11 @@ export default function AddJobPage() {
             value={formData.status}
             onChange={handleChange}
             className="input"
+            onInvalid={(e) =>
+              e.target.setCustomValidity("Please select a status from the list.")
+            }
+            onInput={(e) => e.target.setCustomValidity("")}
+            required
           >
             <option value="" disabled>
               Select status
