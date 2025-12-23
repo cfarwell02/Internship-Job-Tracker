@@ -30,7 +30,7 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen py-12 max-w-5xl mx-auto pt-20 px-6">
-      <h1 className="text-4xl font-bold text-white mb-8 text-center">
+      <h1 className="text-4xl font-bold text-white mb-8 text-center tracking-tight">
         📊 Internship Dashboard
       </h1>
 
@@ -42,8 +42,8 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {jobs.map((job) => (
             <Link key={job.id} href={`/${job.id}`}>
-              <div className="bg-white/5 border border-white/10 rounded-xl p-4 backdrop-blur-sm hover:bg-white/10 transition duration-300 cursor-pointer shadow-md hover:shadow-lg">
-                <h3 className="text-xl font-semibold text-white mb-2">
+              <div className="bg-[#0f1a2f] border border-white/10 rounded-xl p-4 backdrop-blur-sm hover:bg-white/10 transition duration-300 cursor-pointer shadow-lg hover:shadow-[0_12px_40px_rgba(0,0,0,0.35)]">
+                <h3 className="text-xl font-semibold text-white mb-2 tracking-tight">
                   {job.company}
                 </h3>
                 <p className="text-slate-300 text-sm">

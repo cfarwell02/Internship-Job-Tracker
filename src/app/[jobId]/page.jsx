@@ -91,9 +91,9 @@ export default function JobDetailPage() {
     return <p className="text-center py-10 text-red-500">❌ Job not found</p>;
 
   return (
-    <main className="min-h-screen bg-slate-900 text-white px-6 py-10 pt-20">
-      <div className="max-w-2xl mx-auto bg-slate-800 p-6 rounded-xl border border-slate-700 shadow">
-        <h1 className="text-3xl font-bold mb-6">
+    <main className="min-h-screen bg-[#0b1220] text-white px-6 py-10 pt-20">
+      <div className="max-w-2xl mx-auto bg-[#0f1a2f] p-6 rounded-xl border border-white/10 shadow-xl">
+        <h1 className="text-3xl font-bold mb-6 tracking-tight">
           🔍 {editing ? "Edit Internship" : job.company}
         </h1>
 

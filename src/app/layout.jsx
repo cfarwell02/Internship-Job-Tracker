@@ -9,7 +9,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className="bg-slate-900 text-white min-h-screen">
+      <body className="bg-[#0b1220] text-slate-100 min-h-screen">
         <TopNavBar /> {/* <- ✅ put this inside body */}
         {children}
       </body>

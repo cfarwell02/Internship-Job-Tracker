@@ -130,9 +130,11 @@ export default function AddJobPage() {
   };
 
   return (
-    <main className="min-h-screen py-10 bg-slate-900 text-white pt-20 px-6">
-      <div className="max-w-3xl mx-auto bg-slate-800 p-8 rounded-2xl shadow-lg border border-slate-700">
-        <h2 className="text-3xl font-bold mb-6">📋 Internship Details</h2>
+    <main className="min-h-screen py-10 bg-[#0b1220] text-white pt-20 px-6">
+      <div className="max-w-3xl mx-auto bg-[#0f1a2f] p-8 rounded-2xl shadow-xl border border-white/10">
+        <h2 className="text-3xl font-bold mb-6 tracking-tight">
+          📋 Internship Details
+        </h2>
 
         <div className="flex flex-col gap-4 mb-6">
           <input
@@ -145,7 +147,7 @@ export default function AddJobPage() {
           <button
             onClick={extractJobData}
             disabled={!url.trim()}
-            className="bg-emerald-600 hover:bg-emerald-500 transition text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 transition text-slate-900 font-semibold px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loadingExtract ? "Extracting..." : "Extract with AI"}
           </button>

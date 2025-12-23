@@ -3,8 +3,8 @@
   top: 0;
   left: 0;
   width: 100%;
-  background: #0f172a; /* slate-900 */
-  border-bottom: 1px solid #1e293b; /* slate-800 */
+  background: linear-gradient(90deg, rgba(10, 15, 30, 0.9), rgba(10, 15, 25, 0.7));
+  border-bottom: 1px solid rgba(94, 234, 212, 0.15);
   z-index: 50;
   height: 4rem;
   display: flex;
@@ -22,10 +22,11 @@
 }
 
 .logo {
-  color: white;
+  color: #a5f3fc; /* teal-200 */
   font-size: 1.25rem;
   font-weight: bold;
   text-decoration: none;
+  letter-spacing: 0.01em;
 }
 
 .navlinks {
@@ -34,12 +35,12 @@
 }
 
 .navlink {
-  color: #e2e8f0; /* slate-200 */
+  color: #cbd5e1; /* slate-300 */
   text-decoration: none;
   font-size: 1rem;
   transition: color 0.2s;
 }
 
 .navlink:hover {
-  color: #fff;
+  color: #a5f3fc;
 }

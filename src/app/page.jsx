@@ -30,12 +30,12 @@ export default function HomePage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 pt-24 px-6 text-white relative overflow-hidden">
-      {/* Blobs background */}
+    <main className="min-h-screen bg-gradient-to-br from-[#0b1220] via-[#0f1a30] to-[#0b1220] pt-24 px-6 text-white relative overflow-hidden">
+      {/* Glow background */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply blur-3xl opacity-20 animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply blur-3xl opacity-20 animate-pulse delay-500" />
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] bg-indigo-500 rounded-full mix-blend-multiply blur-3xl opacity-10 animate-pulse delay-700" />
+        <div className="absolute -top-32 -right-20 w-96 h-96 bg-teal-500/30 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-32 -left-10 w-80 h-80 bg-emerald-400/25 rounded-full blur-[100px]" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[28rem] h-[28rem] bg-cyan-500/10 rounded-full blur-[110px]" />
       </div>
 
       {/* Grid overlay */}
@@ -47,24 +47,24 @@ export default function HomePage() {
           isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
         }`}
       >
-        <h2 className="text-4xl sm:text-5xl font-bold mb-4">
+        <h2 className="text-4xl sm:text-5xl font-bold mb-4 tracking-tight">
           Internship Tracker
         </h2>
-        <p className="text-lg sm:text-xl text-slate-300 mb-10">
-          Stay on top of your internship applications — all in one place.
+        <p className="text-lg sm:text-xl text-slate-300 mb-10 max-w-2xl mx-auto">
+          Track applications, offers, and follow-ups with a streamlined, modern dashboard.
         </p>
 
         {/* CTA buttons */}
         <div className="flex flex-col sm:flex-row justify-center gap-4 mb-14">
           <Link
             href="/add-job"
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-3 text-lg font-semibold rounded-xl shadow-md hover:scale-105 hover:from-purple-500 hover:to-indigo-500 transition-transform duration-300"
+            className="bg-gradient-to-r from-teal-500 to-emerald-500 px-6 py-3 text-lg font-semibold rounded-xl shadow-md hover:scale-105 hover:from-teal-400 hover:to-emerald-400 transition-transform duration-300 text-slate-900"
           >
             ➕ Add New Internship
           </Link>
           <Link
             href="/dashboard"
-            className="border border-white/20 px-6 py-3 text-lg font-semibold rounded-xl backdrop-blur-sm hover:bg-white/10 hover:border-white/40 transition-transform duration-300 hover:scale-105"
+            className="border border-white/15 px-6 py-3 text-lg font-semibold rounded-xl backdrop-blur-sm hover:bg-white/10 hover:border-white/30 transition-transform duration-300 hover:scale-105"
           >
             📈 View Dashboard
           </Link>
@@ -79,9 +79,11 @@ export default function HomePage() {
           ].map((stat) => (
             <div
               key={stat.label}
-              className="px-6 py-4 bg-white/5 border border-white/10 backdrop-blur-md rounded-xl hover:bg-white/10 transition duration-300 hover:scale-105"
+              className="px-6 py-4 bg-white/5 border border-white/10 backdrop-blur-md rounded-xl hover:bg-white/10 transition duration-300 hover:scale-105 shadow-[0_10px_40px_rgba(0,0,0,0.25)]"
             >
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-2xl font-bold text-teal-300">
+                {stat.value}
+              </div>
               <div className="text-sm text-slate-400">{stat.label}</div>
             </div>
           ))}
