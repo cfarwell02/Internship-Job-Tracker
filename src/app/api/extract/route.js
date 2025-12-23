@@ -37,13 +37,15 @@ async function fetchPageContent(url) {
 }
 
 // Helper to block heavy assets/trackers
-function shouldAbortRequest(req, isHandshake) {
+function shouldAbortRequest(req, isHandshake, isVercel) {
   const type = req.resourceType();
   const urlReq = req.url();
   const blockedTypes =
     type === "media" ||
     type === "font" ||
-    (!isHandshake && (type === "image" || type === "stylesheet"));
+    // In Vercel, block images/CSS everywhere to reduce timeouts; locally allow Handshake CSS/images.
+    (isVercel ? true : !isHandshake) &&
+      (type === "image" || type === "stylesheet");
   const blockedTrackers =
     urlReq.includes("google-analytics") ||
     urlReq.includes("doubleclick") ||
@@ -103,6 +105,7 @@ async function fetchPageWithPuppeteer(url) {
   let browser;
   let page;
   let handshakeOnJobPage = false;
+  const isVercel = !!process.env.VERCEL;
 
   try {
     let puppeteer;
@@ -141,7 +144,7 @@ async function fetchPageWithPuppeteer(url) {
     const isHandshake = url.includes("joinhandshake.com");
     await page.setRequestInterception(true);
     page.on("request", (req) => {
-      if (shouldAbortRequest(req, isHandshake)) return req.abort();
+      if (shouldAbortRequest(req, isHandshake, isVercel)) return req.abort();
       req.continue();
     });
 
@@ -322,14 +325,6 @@ async function fetchPageWithPuppeteer(url) {
     return html;
   } catch (err) {
     console.error("❌ Puppeteer fetch failed:", err);
-    if (page) {
-      try {
-        const screenshotPath = `/tmp/handshake_error_${Date.now()}.png`;
-        await page.screenshot({ path: screenshotPath, fullPage: true });
-      } catch (sErr) {
-        console.warn("⚠️ Failed to capture error screenshot:", sErr.message);
-      }
-    }
     return null;
   } finally {
     if (browser) {
@@ -549,6 +544,7 @@ Here is the job text:
 export async function POST(req) {
   try {
     let { url } = await req.json();
+    const isVercel = !!process.env.VERCEL;
 
     // Input validation for URL
     if (!url || typeof url !== "string" || !url.startsWith("http")) {
@@ -597,7 +593,8 @@ export async function POST(req) {
     // Increased the threshold for HTML length to be more aggressive about using Puppeteer
     const shouldUsePuppeteer =
       !html ||
-      html.length < 10000 || // Adjusted threshold: if less than 10KB, try Puppeteer
+      (!isVercel && html.length < 10000) ||
+      (isVercel && html.length < 2000) ||
       loginGateKeywords.some((kw) => html.includes(kw));
 
     if (shouldUsePuppeteer) {
